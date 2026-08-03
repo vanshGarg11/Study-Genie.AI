@@ -1,7 +1,9 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/authMiddleware";
-import { getBalance } from "../services/coinService";
-import { getTransactionHistory } from "../services/coinService";
+import {
+  getBalance,
+  getTransactionHistory,
+} from "../services/coinService";
 
 export const getCoinBalance = async (
   req: AuthRequest,

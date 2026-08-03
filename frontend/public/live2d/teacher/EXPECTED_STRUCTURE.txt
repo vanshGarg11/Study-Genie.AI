@@ -1,0 +1,21 @@
+frontend/public/live2d/teacher/
+  teacher.model3.json
+  teacher.moc3
+  textures/
+    texture_00.png
+  motions/
+    idle.motion3.json
+    talk.motion3.json
+  expressions/
+    normal.exp3.json
+    happy.exp3.json
+  teacher.physics3.json
+  teacher.pose3.json
+  teacher.cdi3.json
+
+Notes:
+- Your downloaded model may use different names.
+- Keep the names used inside teacher.model3.json consistent with the real files.
+- The Live2D Viewer opens .model3.json or .moc3.
+- The StudyGenie web app should load .model3.json.
+

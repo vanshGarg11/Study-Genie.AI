@@ -24,7 +24,6 @@ export const addCoins = async (
 
   return user;
 };
-
 export const deductCoins = async (
   userId: string,
   amount: number,
@@ -37,7 +36,7 @@ export const deductCoins = async (
   }
 
   if (user.coins < amount) {
-    throw new Error("Insufficient coins");
+    throw new Error("INSUFFICIENT_COINS");
   }
 
   user.coins -= amount;

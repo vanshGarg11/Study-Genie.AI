@@ -1,10 +1,14 @@
 import { Response } from "express";
 
 import { AuthRequest } from "../middleware/authMiddleware";
-import { deductCoins } from "../services/coinService";
-import { generateNotes } from "../services/geminiService";
-import { generateFlashcards } from "../services/geminiService";
-import { generateQuiz } from "../services/geminiService";
+import { handleCoinDeduction } from "../utils/handleCoinDeduction";
+import Note from "../models/Note";
+
+import {
+  generateNotes,
+  generateQuiz,
+  generateFlashcards,
+} from "../services/groqService";
 
 export const generateStudyNotes = async (
   req: AuthRequest,
@@ -21,17 +25,18 @@ export const generateStudyNotes = async (
       return;
     }
 
-    await deductCoins(
-      req.user.userId,
-      5,
-      "Notes Generation"
-    );
-
-    const notes = await generateNotes(topic);
+    const cleanTopic = topic.trim();
+    const notes = await generateNotes(cleanTopic);
+    const savedNote = await Note.create({
+      userId: req.user.userId,
+      topic: cleanTopic,
+      notes,
+    });
 
     res.status(200).json({
       success: true,
       notes,
+      note: savedNote,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -41,6 +46,27 @@ export const generateStudyNotes = async (
   }
 };
 
+export const getStudyNotes = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const notes = await Note.find({ userId: req.user.userId })
+      .sort({ createdAt: -1 })
+      .select("topic notes createdAt updatedAt");
+
+    res.status(200).json({
+      success: true,
+      notes,
+      count: notes.length,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 export const generateStudyQuiz = async (
   req: AuthRequest,
@@ -57,11 +83,14 @@ export const generateStudyQuiz = async (
       return;
     }
 
-    await deductCoins(
+    const success = await handleCoinDeduction(
       req.user.userId,
       3,
-      "Quiz Generation"
+      "Quiz Generation",
+      res
     );
+
+    if (!success) return;
 
     const quiz = await generateQuiz(topic);
 
@@ -69,7 +98,6 @@ export const generateStudyQuiz = async (
       success: true,
       quiz,
     });
-
   } catch (error: any) {
     res.status(500).json({
       success: false,
@@ -77,7 +105,6 @@ export const generateStudyQuiz = async (
     });
   }
 };
-
 
 export const generateStudyFlashcards = async (
   req: AuthRequest,
@@ -94,14 +121,16 @@ export const generateStudyFlashcards = async (
       return;
     }
 
-    await deductCoins(
+    const success = await handleCoinDeduction(
       req.user.userId,
       2,
-      "Flashcards Generation"
+      "Flashcards Generation",
+      res
     );
 
-    const flashcards =
-      await generateFlashcards(topic);
+    if (!success) return;
+
+    const flashcards = await generateFlashcards(topic);
 
     res.status(200).json({
       success: true,

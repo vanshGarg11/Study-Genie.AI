@@ -75,7 +75,6 @@ export const login = async (
 ): Promise<void> => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       res.status(400).json({
         success: false,
