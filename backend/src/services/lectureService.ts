@@ -1,62 +1,96 @@
-import Groq from "groq-sdk";
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const getGenAI = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY_HERE") {
+    throw new Error("GEMINI_API_KEY is not configured in backend/.env");
+  }
+  return new GoogleGenerativeAI(apiKey);
+};
+
+const safetySettings = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+];
+
+const CANDIDATE_MODELS = [
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-flash-latest",
+  "gemini-flash-lite-latest",
+  "gemini-2.5-pro",
+  "gemini-pro-latest",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-latest",
+  "gemini-2.0-flash",
+  "gemini-pro",
+];
+
+const cleanJsonString = (raw: string): string => {
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("```json")) {
+    cleaned = cleaned.replace(/^```json\s*/i, "");
+  } else if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```\s*/, "");
+  }
+  if (cleaned.endsWith("```")) {
+    cleaned = cleaned.replace(/\s*```$/, "");
+  }
+  return cleaned.trim();
+};
 
 export const generateLecturePlan = async (text: string) => {
-  const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    temperature: 0.45,
-    response_format: {
-      type: "json_object",
-    },
-    messages: [
-      {
-        role: "system",
-        content: `
+  const genAI = getGenAI();
+
+  const prompt = `
 You are StudyGenie AI Teacher.
-
 Convert study material into a full video-style lecture.
-The output must feel like a teacher speaking directly to a student, not like notes.
 
-Return ONLY valid JSON.
-
-Format:
+Return ONLY valid JSON:
 {
-  "title": "",
+  "title": "Lecture Title",
   "segments": [
     {
-      "heading": "",
-      "objective": "",
-      "script": "",
-      "recap": "",
-      "checkpointQuestion": ""
+      "heading": "Segment Title",
+      "objective": "What the student will learn in 1 sentence",
+      "script": "Natural classroom spoken teacher narration (120-200 words)",
+      "recap": "1 sentence recap",
+      "checkpointQuestion": "Quick check-in question"
     }
   ]
 }
 
 Rules:
-- Create 6 to 10 lecture segments.
-- Each script should be spoken teacher narration.
-- Explain step by step with examples.
-- Use simple classroom language.
-- Do not mention that you are an AI.
-- Keep each script between 120 and 220 words.
-`,
-      },
-      {
-        role: "user",
-        content: `
+- Create 5 to 8 lecture segments.
+- Spoken narration style without bullet points.
+
 Study Material:
-
 ${text.substring(0, 30000)}
-`,
-      },
-    ],
-  });
+`;
 
-  return JSON.parse(completion.choices[0].message.content as string);
+  let lastError = null;
+  for (const modelName of CANDIDATE_MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        safetySettings,
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.45,
+        },
+      });
+      const result = await model.generateContent(prompt);
+      const jsonStr = cleanJsonString(result.response.text());
+      return JSON.parse(jsonStr);
+    } catch (err: any) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw new Error(`Failed to generate lecture with Gemini: ${lastError?.message || "Unknown error"}`);
 };
 
 export const answerLectureQuestion = async (
@@ -64,29 +98,13 @@ export const answerLectureQuestion = async (
   currentSegment: string,
   question: string
 ) => {
-  const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    temperature: 0.25,
-    messages: [
-      {
-        role: "system",
-        content: `
-You are a live teacher in front of the student.
+  const genAI = getGenAI();
 
+  const prompt = `
+You are a live teacher in front of the student.
 The student interrupted your lecture to ask a question.
 Answer conversationally, using the lecture content only.
-After answering, end with one short sentence that invites the student to continue.
 
-Rules:
-- Do not invent content outside the lecture.
-- If the answer is not present, say it is not covered in this lecture segment.
-- Keep answers clear and short.
-- Return plain text, not JSON.
-`,
-      },
-      {
-        role: "user",
-        content: `
 Full Lecture Context:
 ${lectureContext.substring(0, 22000)}
 
@@ -95,10 +113,23 @@ ${currentSegment}
 
 Student Question:
 ${question}
-`,
-      },
-    ],
-  });
+`;
 
-  return completion.choices[0].message.content || "";
+  let lastError = null;
+  for (const modelName of CANDIDATE_MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        safetySettings,
+        generationConfig: { temperature: 0.25 },
+      });
+      const result = await model.generateContent(prompt);
+      return result.response.text().trim();
+    } catch (err: any) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw new Error(`Failed to answer lecture question: ${lastError?.message || "Unknown error"}`);
 };

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import AppLayout from "../components/AppLayout";
 import {
-  ArrowLeft,
   BookOpenCheck,
-  CheckCircle2,
   ChevronRight,
-  Loader2,
+  Layers,
+  HelpCircle,
+  Upload,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import api from "../services/api";
 
 interface LessonItem {
@@ -14,9 +16,8 @@ interface LessonItem {
   title: string;
   slidesCount: number;
   quizCount: number;
-  createdAt: string;
+  pdfId: string;
   progress?: {
-    currentSlide?: number;
     completed?: boolean;
     quizScore?: number;
   };
@@ -26,120 +27,107 @@ export default function MyLessons() {
   const navigate = useNavigate();
   const [lessons, setLessons] = useState<LessonItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
+    const fetchLessons = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get("/api/lesson");
+        setLessons(res.data.lessons || []);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchLessons();
   }, []);
 
-  const fetchLessons = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await api.get("/api/lesson/my-lessons");
-      setLessons(res.data.lessons || []);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Could not load lessons.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#0E1116] text-[#ECEEF3]">
-      <header className="h-[72px] flex items-center justify-between px-8 border-b border-[#262B34]">
+    <AppLayout
+      title="My Course Lessons"
+      subtitle={`${lessons.length} Multi-slide curriculum courses with interactive quiz checkpoints`}
+      actionButton={
         <button
-          onClick={() => navigate("/dashboard")}
-          className="flex items-center gap-2 text-sm text-[#7D8494] hover:text-[#ECEEF3]"
+          onClick={() => navigate("/pdfs")}
+          className="btn-violet flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-md cursor-pointer"
         >
-          <ArrowLeft size={16} />
-          Dashboard
+          <Upload size={14} />
+          <span>Generate from PDF</span>
         </button>
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-[0.2em] text-[#7D8494]">Library</p>
-          <h1 className="text-lg font-semibold">My Lessons</h1>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto p-8">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 border border-[#262B34] bg-[#12161D] flex items-center justify-center">
-            <BookOpenCheck size={22} className="text-[#4C6FFF]" />
-          </div>
-          <div>
-            <h2 className="text-3xl font-bold">Generated Lessons</h2>
-            <p className="text-sm text-[#8B92A3] mt-1">
-              Continue lessons and track quiz completion.
-            </p>
-          </div>
-        </div>
-
+      }
+    >
+      <div className="max-w-7xl mx-auto space-y-6">
         {loading ? (
-          <div className="h-48 flex items-center justify-center border border-[#262B34] bg-[#12161D]">
-            <Loader2 className="animate-spin text-[#4C6FFF]" size={28} />
-          </div>
-        ) : error ? (
-          <div className="border border-[#E8556B]/30 bg-[#1A0E10] text-[#E8556B] p-5">
-            {error}
+          <div className="h-72 flex items-center justify-center">
+            <span className="text-xs font-mono text-violet-400">Loading course library...</span>
           </div>
         ) : lessons.length === 0 ? (
-          <div className="border border-dashed border-[#262B34] p-12 text-center">
-            <BookOpenCheck size={44} className="mx-auto text-[#5A6070]" />
-            <h3 className="mt-4 text-xl font-semibold">No lessons yet</h3>
-            <p className="mt-2 text-sm text-[#8B92A3]">
-              Open a PDF chat and generate your first AI lesson.
+          <div className="p-16 rounded-3xl neon-card text-center space-y-4 border-dashed">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-white/[0.03] border border-white/[0.08] text-gray-500 flex items-center justify-center">
+              <BookOpenCheck size={32} />
+            </div>
+            <h3 className="text-lg font-bold text-white">No Lessons Generated Yet</h3>
+            <p className="text-xs text-gray-400 max-w-md mx-auto">
+              Go to your PDF library or upload a document and click "Generate Lesson" to create an interactive multi-slide course.
             </p>
             <button
               onClick={() => navigate("/pdfs")}
-              className="mt-6 px-5 py-3 bg-[#4C6FFF] text-white font-semibold"
+              className="btn-violet px-6 py-2.5 rounded-xl text-xs font-bold cursor-pointer"
             >
-              Open My PDFs
+              Browse PDF Library
             </button>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {lessons.map((lesson) => {
-              const completed = Boolean(lesson.progress?.completed);
-              const currentSlide = lesson.progress?.currentSlide ?? 0;
-              const progressPercent = lesson.slidesCount
-                ? Math.round(((currentSlide + 1) / lesson.slidesCount) * 100)
-                : 0;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {lessons.map((lesson, idx) => (
+              <motion.div
+                key={lesson._id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="p-6 rounded-3xl neon-card flex flex-col justify-between space-y-5 group border-violet-500/20"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-400 flex items-center justify-center">
+                      <BookOpenCheck size={20} />
+                    </div>
 
-              return (
-                <button
-                  key={lesson._id}
-                  onClick={() => navigate(`/lesson/${lesson._id}`)}
-                  className="text-left border border-[#262B34] bg-[#12161D] p-5 hover:border-[#3A4150] transition flex items-center justify-between gap-5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      {completed && <CheckCircle2 size={16} className="text-[#22C58B]" />}
-                      <h3 className="font-semibold truncate">{lesson.title}</h3>
-                    </div>
-                    <p className="text-xs text-[#7D8494] mt-1">
-                      {lesson.slidesCount} slides · {lesson.quizCount} quiz questions ·{" "}
-                      {new Date(lesson.createdAt).toLocaleDateString()}
-                    </p>
-                    <div className="mt-4 h-2 bg-[#0E1116] border border-[#262B34] max-w-md">
-                      <div
-                        className={completed ? "h-full bg-[#22C58B]" : "h-full bg-[#4C6FFF]"}
-                        style={{ width: `${completed ? 100 : progressPercent}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-[#8B92A3] mt-2">
-                      {completed
-                        ? `Completed · Score ${lesson.progress?.quizScore || 0}/${lesson.quizCount}`
-                        : `Resume at slide ${currentSlide + 1}`}
-                    </p>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md badge-violet">
+                      AI Course
+                    </span>
                   </div>
-                  <ChevronRight size={20} className="text-[#4C6FFF] shrink-0" />
-                </button>
-              );
-            })}
+
+                  <h3 className="text-base font-bold text-white group-hover:text-violet-300 transition-colors line-clamp-2 leading-snug">
+                    {lesson.title}
+                  </h3>
+
+                  <div className="flex items-center gap-3 text-xs text-gray-400 font-mono">
+                    <span className="flex items-center gap-1">
+                      <Layers size={13} className="text-violet-400" />
+                      {lesson.slidesCount} Slides
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <HelpCircle size={13} className="text-cyan-400" />
+                      {lesson.quizCount} Quizzes
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-white/[0.06] flex items-center justify-between">
+                  <button
+                    onClick={() => navigate(`/lesson/${lesson._id}`)}
+                    className="btn-violet px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-violet-600/20"
+                  >
+                    <span>Start Lesson</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 }

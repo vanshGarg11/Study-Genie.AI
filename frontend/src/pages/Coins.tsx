@@ -1,445 +1,338 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import AppLayout from "../components/AppLayout";
 import {
-  Coins as CoinsIcon,
-  Brain,
-  Upload,
-  User,
-  LogOut,
-  Home,
   Sparkles,
-  ArrowLeft,
-  FolderOpen,
   ArrowUpRight,
   ArrowDownRight,
-  Wallet,
+  Receipt,
+  CheckCircle2,
+  CreditCard,
+  Loader2,
+  Coins,
 } from "lucide-react";
+import Counter from "../components/Counter";
 import api from "../services/api";
-
-const AMBER = "#F2B705";
+import { useUser } from "../context/userContextValue";
+import toast from "react-hot-toast";
 
 const packages = [
-  { coins: 100, price: 49 },
-  { coins: 250, price: 99 },
-  { coins: 500, price: 199 },
-  { coins: 1000, price: 349 },
-];
-
-const navItems = [
-  { label: "Dashboard", path: "/dashboard", icon: Home, index: "01" },
-  { label: "Generate Notes", path: "/notes", icon: Brain, index: "02" },
-  { label: "Upload PDF", path: "/pdf", icon: Upload, index: "03" },
-  { label: "Buy Coins", path: "/coins", icon: CoinsIcon, index: "04" },
-  { label: "Profile", path: "/profile", icon: User, index: "05" },
+  {
+    id: "starter",
+    name: "Scholar Starter",
+    coins: 50,
+    price: 49,
+    popular: false,
+    tagline: "Great for quick exam chapter revision",
+    features: [
+      "25 Full AI Note Syntheses",
+      "16 Interactive 3D Flashcard Decks",
+      "16 MCQ Quiz Arena Assessments",
+      "Instant PDF Document Grounding",
+      "Standard Response Priority",
+    ],
+  },
+  {
+    id: "scholar",
+    name: "Semester Pro",
+    coins: 200,
+    price: 149,
+    popular: true,
+    tagline: "Most popular choice for active college students",
+    features: [
+      "100 Full AI Note Syntheses",
+      "66 Interactive 3D Flashcard Decks",
+      "66 MCQ Quiz Arena Assessments",
+      "Full Multi-Slide Course Lesson Generator",
+      "Live2D Interactive Teacher Lectures",
+      "Fast-Track GPU Generation Priority",
+    ],
+  },
+  {
+    id: "master",
+    name: "Master Suite",
+    coins: 500,
+    price: 299,
+    popular: false,
+    tagline: "Uncapped power for full academic year mastery",
+    features: [
+      "250 Full AI Note Syntheses",
+      "166 Interactive 3D Flashcard Decks",
+      "166 MCQ Quiz Arena Assessments",
+      "Unlimited Multi-Slide Course Generation",
+      "Unlimited Live2D Interactive Lectures",
+      "VIP Dedicated GPU Priority",
+      "Never Expiring Coin Ledger Balance",
+    ],
+  },
 ];
 
 interface Transaction {
   _id: string;
-  type: "credit" | "debit";
   amount: number;
-  reason: string;
+  coins: number;
+  type: "credit" | "debit";
+  description: string;
   createdAt: string;
 }
 
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
-}
-
-export default function Coins() {
+export default function CoinsPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const [coins, setCoins] = useState(0);
+  const { user, refreshUser } = useUser();
+  const [loadingPkg, setLoadingPkg] = useState<string | null>(null);
   const [history, setHistory] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchCoins();
+    const fetchHistory = async () => {
+      try {
+        const res = await api.get("/api/user/ledger");
+        setHistory(res.data.transactions || []);
+      } catch {
+        // non-blocking
+      }
+    };
+    fetchHistory();
   }, []);
 
-  const fetchCoins = async () => {
-    try {
-      const [balanceRes, historyRes] = await Promise.all([
-        api.get("/api/coins/balance"),
-        api.get("/api/coins/history"),
-      ]);
-      setCoins(balanceRes.data.coins);
-      setHistory(historyRes.data.history);
-    } catch {
-      setError("Could not load your coin balance. Please refresh the page.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
-  };
-
-  const buyCoins = async (coins: number) => {
-    setError("");
-
-    if (!window.Razorpay) {
-      setError("Payment checkout is not loaded. Please refresh and try again.");
+  const handlePurchase = async (pkg: typeof packages[0]) => {
+    if (!localStorage.getItem("token")) {
+      toast.error("Please login or register to purchase coin packages.");
+      navigate("/login");
       return;
     }
-
+    setLoadingPkg(pkg.id);
     try {
-      const { data } = await api.post("/api/payment/create-order", { coins });
+      const res = await api.post("/api/payment/create-order", {
+        packageId: pkg.id,
+        amount: pkg.price,
+        coins: pkg.coins,
+      });
+
+      const order = res.data.order;
 
       const options = {
-        key: data.key,
-        amount: data.order.amount,
-        currency: data.order.currency,
-        order_id: data.order.id,
-        name: "StudyGenie",
-        description: `${coins} Coins`,
-
+        key: res.data.key || "rzp_test_TE2wUyVmLYKPS2",
+        amount: order.amount,
+        currency: order.currency,
+        name: "StudyGenie AI",
+        description: `${pkg.coins} Scholar Coins Pack`,
+        order_id: order.id,
         handler: async (response: any) => {
-          await api.post("/api/payment/verify", {
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-          });
-
-          await fetchCoins();
-
-          alert("Coins added successfully!");
+          try {
+            await api.post("/api/payment/verify", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              packageId: pkg.id,
+              coins: pkg.coins,
+              amount: pkg.price,
+            });
+            await refreshUser();
+            toast.success(`Success! +${pkg.coins} coins added to your wallet.`);
+          } catch {
+            toast.error("Payment verification failed.");
+          }
         },
-
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+        },
         theme: {
-          color: "#4C6FFF",
+          color: "#8B5CF6",
         },
       };
 
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+      const razorpayInstance = new (window as any).Razorpay(options);
+      razorpayInstance.open();
     } catch {
-      setError("Could not start payment. Please try again.");
+      toast.error("Failed to initialize payment gateway.");
+    } finally {
+      setLoadingPkg(null);
     }
   };
 
   return (
-    <div className="sg-root min-h-screen flex font-[Inter] bg-[#0E1116] text-[#ECEEF3] overflow-x-hidden relative">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
-
-        .sg-root { --ink:#0E1116; --line:#262B34; --line-soft:#1B1F27; --muted:#7D8494; --cobalt:#4C6FFF; --amber:#F2B705; --green:#22C58B; --coral:#E8556B; }
-        .sg-serif { font-family:'Fraunces', serif; font-optical-sizing:auto; }
-        .sg-mono { font-family:'IBM Plex Mono', monospace; }
-
-        .sg-rule-bg {
-          background-image: repeating-linear-gradient(
-            to bottom,
-            transparent 0px, transparent 31px, var(--line-soft) 32px
-          );
-        }
-
-        @keyframes riseIn {
-          from { opacity:0; transform: translateY(14px); }
-          to { opacity:1; transform: translateY(0); }
-        }
-        .sg-rise { opacity:0; animation: riseIn .5s cubic-bezier(.2,.7,.2,1) forwards; }
-
-        @keyframes pulseLine {
-          0%, 100% { opacity: .35; }
-          50% { opacity: .75; }
-        }
-        .sg-skel { animation: pulseLine 1.3s ease-in-out infinite; background: #151920; border: 1px solid var(--line); }
-
-        .sg-nav-item {
-          position: relative;
-          border: 1px solid transparent;
-        }
-        .sg-nav-item .sg-bracket {
-          position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-          background: var(--cobalt);
-          transform: scaleY(0);
-          transform-origin: top;
-          transition: transform .28s cubic-bezier(.2,.8,.2,1);
-        }
-        .sg-nav-item:hover .sg-bracket, .sg-nav-item[data-active="true"] .sg-bracket {
-          transform: scaleY(1);
-        }
-        .sg-nav-item:hover, .sg-nav-item[data-active="true"] {
-          border-color: var(--line);
-          background: #151920;
-        }
-        .sg-nav-item .sg-idx {
-          transition: color .2s ease, opacity .2s ease;
-          opacity: .45;
-        }
-        .sg-nav-item:hover .sg-idx, .sg-nav-item[data-active="true"] .sg-idx {
-          opacity: 1;
-          color: var(--cobalt);
-        }
-
-        .sg-back-btn {
-          transition: transform .18s ease, color .18s ease, border-color .18s ease;
-        }
-        .sg-back-btn:hover {
-          transform: translateX(-2px);
-          border-color: #3a4150;
-          color: #ECEEF3;
-        }
-
-        .sg-balance-card {
-          border: 1px solid var(--amber);
-          background: #12161D;
-        }
-
-        .sg-txn-row {
-          border: 1px solid var(--line);
-          transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
-        }
-        .sg-txn-row:hover {
-          transform: translate(-2px,-2px);
-          box-shadow: 4px 4px 0 0 rgba(242,183,5,0.2);
-          border-color: #3a4150;
-        }
-
-        .sg-btn-logout {
-          transition: background .2s ease, color .2s ease, border-color .2s ease, letter-spacing .2s ease;
-        }
-        .sg-btn-logout:hover { letter-spacing: 0.04em; }
-
-        .sg-corner-cut {
-          clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-        }
-      `}</style>
-
-      {/* Sidebar */}
-      <aside className="w-64 shrink-0 bg-[#0B0E13] border-r border-[#262B34] p-5 flex flex-col justify-between z-10">
-        <div>
-          <div
-            className="flex items-center gap-3 px-1 mb-9 group cursor-pointer"
-            onClick={() => navigate("/dashboard")}
-          >
-            <div className="w-9 h-9 border border-[#262B34] flex items-center justify-center bg-[#12161D] sg-corner-cut">
-              <Sparkles size={16} className="text-[#4C6FFF]" />
+    <AppLayout
+      title="Coin Wallet & Top-Up"
+      subtitle="Power your AI notes, 3D flashcards, and interactive Live2D classroom lectures"
+      actionButton={
+        <button
+          onClick={() => navigate("/payments")}
+          className="btn-ghost flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold"
+        >
+          <Receipt size={14} />
+          <span>Payment Receipts</span>
+        </button>
+      }
+    >
+      <div className="max-w-7xl mx-auto space-y-10">
+        {/* Coin Balance Hero Widget */}
+        <div className="p-8 sm:p-12 rounded-3xl neon-card bg-gradient-to-r from-violet-950/60 via-[#0D0F1A] to-cyan-950/40 border border-violet-500/30 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="space-y-3 text-center md:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full badge-violet text-xs font-mono font-semibold">
+              <Sparkles size={13} />
+              <span>Instant AI Computation Power</span>
             </div>
-            <span className="sg-serif text-xl font-semibold tracking-tight text-[#ECEEF3]">
-              StudyGenie
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              Recharge Your Learning Engine
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-300 max-w-lg">
+              Coins are only consumed when generating fresh notes (-2), flashcard decks (-3), or custom AI quiz arenas (-3).
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-black/60 border border-violet-500/40 text-center min-w-[200px] glow-violet">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mb-2">
+              <Coins size={24} />
+            </div>
+            <span className="text-[10px] font-mono uppercase text-gray-400 block tracking-widest">
+              Available Balance
+            </span>
+            <span className="text-4xl font-mono font-black text-amber-400">
+              <Counter end={user?.coins ?? 0} />
+            </span>
+            <span className="text-[11px] text-gray-400 block mt-1">
+              Coins Active
             </span>
           </div>
-
-          <p className="sg-mono text-[10px] uppercase tracking-[0.2em] text-[#7D8494] mb-3 px-1">
-            Navigate
-          </p>
-
-          <nav className="space-y-1">
-            {navItems.map(({ label, path, icon: Icon, index }) => {
-              const active = location.pathname === path;
-              return (
-                <button
-                  key={path}
-                  onClick={() => navigate(path)}
-                  data-active={active}
-                  aria-current={active ? "page" : undefined}
-                  className="sg-nav-item w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-[#B7BCC7]"
-                >
-                  <span className="sg-bracket" />
-                  <span className="flex items-center gap-3 relative z-10">
-                    <Icon size={16} className={active ? "text-[#4C6FFF]" : "text-[#7D8494]"} />
-                    <span className={active ? "text-[#ECEEF3]" : ""}>{label}</span>
-                  </span>
-                  <span className="sg-idx sg-mono text-[10px]">{index}</span>
-                </button>
-              );
-            })}
-          </nav>
         </div>
 
-        <button
-          onClick={logout}
-          className="sg-btn-logout w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-[#E8556B] border border-[#2A1A1D] hover:border-[#E8556B]/40 hover:bg-[#1A0E10]"
-        >
-          <LogOut size={16} />
-          <span className="sg-mono text-xs tracking-wide">LOG OUT</span>
-        </button>
-      </aside>
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 z-10">
-        <header className="h-[72px] shrink-0 flex items-center justify-between px-9 border-b border-[#262B34]">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="sg-back-btn flex items-center gap-2 px-3 py-2 border border-[#262B34] text-sm text-[#7D8494] sg-mono"
-          >
-            <ArrowLeft size={15} />
-            BACK
-          </button>
-
-          <div className="flex items-baseline gap-3">
-            <h2 className="sg-serif text-lg font-semibold text-[#ECEEF3]">Coin Wallet</h2>
-            <span className="sg-mono text-[11px] text-[#7D8494]">/ coins</span>
+        {/* 3 Pricing Packages */}
+        <div className="space-y-4">
+          <div className="text-center space-y-1">
+            <h3 className="text-xl font-extrabold text-white">
+              Choose Your Coin Package
+            </h3>
+            <p className="text-xs text-gray-400">
+              Secure payments powered by Razorpay checkout
+            </p>
           </div>
 
-          <button
-            onClick={() => navigate("/pdfs")}
-            className="sg-back-btn flex items-center gap-2 px-3 py-2 border border-[#262B34] text-sm text-[#7D8494] sg-mono"
-          >
-            <FolderOpen size={15} />
-            MY PDFS
-          </button>
-        </header>
-
-        <main className="flex-1 p-9 overflow-y-auto space-y-8 sg-rule-bg">
-          <div className="max-w-3xl mx-auto space-y-8">
-            {loading ? (
-              <>
-                <div className="sg-skel h-32" />
-                <div className="space-y-3">
-                  <div className="sg-skel h-16" />
-                  <div className="sg-skel h-16" />
-                  <div className="sg-skel h-16" />
-                </div>
-              </>
-            ) : (
-              <>
-                {error && (
-                  <div className="sg-rise border border-[#E8556B]/50 bg-[#1A0E10] px-4 py-3 text-sm text-[#E8556B]">
-                    {error}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+            {packages.map((pkg) => (
+              <div
+                key={pkg.id}
+                className={`p-6 sm:p-8 rounded-3xl neon-card flex flex-col justify-between space-y-6 relative transition-all ${
+                  pkg.popular
+                    ? "border-violet-500/60 bg-gradient-to-b from-[#16132E] to-[#0D0F1A] glow-violet-lg scale-[1.02]"
+                    : "border-white/[0.08]"
+                }`}
+              >
+                {pkg.popular && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-violet-600 to-cyan-500 text-white font-mono text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-violet-600/30">
+                    Most Popular Choice
                   </div>
                 )}
 
-                {/* Balance card */}
-                <section className="sg-rise sg-balance-card p-8" style={{ animationDelay: "0ms" }}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-11 h-11 border border-[#262B34] flex items-center justify-center bg-[#0E1116]">
-                      <Wallet size={20} style={{ color: AMBER }} strokeWidth={2.2} />
-                    </div>
-                    <span
-                      className="sg-mono text-[10px] tracking-widest uppercase px-2 py-1 border"
-                      style={{ color: AMBER, borderColor: `${AMBER}4D` }}
-                    >
-                      WALLET
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-lg font-bold text-white">{pkg.name}</h4>
+                    <p className="text-xs text-gray-400 mt-1">{pkg.tagline}</p>
+                  </div>
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl sm:text-4xl font-black text-white font-mono">
+                      ₹{pkg.price}
+                    </span>
+                    <span className="text-xs text-violet-400 font-mono font-bold">
+                      / {pkg.coins} Coins
                     </span>
                   </div>
-                  <p className="sg-mono text-xs uppercase tracking-[0.2em] text-[#7D8494] mb-2">
-                    Current Balance
-                  </p>
-                  <div className="flex items-baseline gap-3">
-                    <CoinsIcon size={32} style={{ color: AMBER }} strokeWidth={2} />
-                    <h1 className="sg-mono text-5xl font-bold text-[#ECEEF3] tabular-nums">
-                      {coins}
-                    </h1>
-                  </div>
-                </section>
 
-                {/* Coin packages */}
-                <section className="space-y-4">
-                  <div className="sg-rise flex items-center gap-3" style={{ animationDelay: "40ms" }}>
-                    <span className="sg-mono text-[10px] uppercase tracking-[0.2em] text-[#7D8494]">
-                      Buy More Coins
-                    </span>
-                    <span className="flex-1 border-t border-[#262B34]" />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {packages.map((pkg, i) => (
-                      <div
-                        key={pkg.coins}
-                        className="sg-rise sg-txn-row bg-[#12161D] p-6"
-                        style={{ animationDelay: `${80 + i * 40}ms` }}
-                      >
-                        <CoinsIcon size={30} style={{ color: AMBER }} className="mb-3" strokeWidth={2} />
-
-                        <h2 className="sg-mono text-2xl font-bold text-[#ECEEF3]">
-                          {pkg.coins} Coins
-                        </h2>
-
-                        <p className="sg-mono text-sm text-[#7D8494] mt-1.5">
-                          ₹{pkg.price}
-                        </p>
-
-                        <button
-                          onClick={() => buyCoins(pkg.coins)}
-                          className="mt-5 w-full bg-[#4C6FFF] hover:bg-[#3b5de7] py-3 text-sm font-semibold sg-mono text-white transition-colors duration-200"
-                        >
-                          BUY NOW
-                        </button>
+                  <div className="space-y-2.5 pt-4 border-t border-white/[0.06]">
+                    {pkg.features.map((feat, i) => (
+                      <div key={i} className="flex items-start gap-2.5 text-xs text-gray-300">
+                        <CheckCircle2 size={15} className="text-cyan-400 shrink-0 mt-0.5" />
+                        <span>{feat}</span>
                       </div>
                     ))}
                   </div>
-                </section>
+                </div>
 
-                {/* Transaction history */}
-                <section className="space-y-4">
-                  <div className="sg-rise flex items-center gap-3" style={{ animationDelay: "80ms" }}>
-                    <span className="sg-mono text-[10px] uppercase tracking-[0.2em] text-[#7D8494]">
-                      Transaction History
-                    </span>
-                    <span className="flex-1 border-t border-[#262B34]" />
-                  </div>
-
-                  {history.length === 0 ? (
-                    <div
-                      className="sg-rise border border-dashed border-[#262B34] p-10 text-center"
-                      style={{ animationDelay: "120ms" }}
-                    >
-                      <p className="text-sm text-[#8B92A3]">No transactions yet.</p>
-                    </div>
+                <button
+                  onClick={() => handlePurchase(pkg)}
+                  disabled={loadingPkg === pkg.id}
+                  className={`w-full py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                    pkg.popular
+                      ? "btn-violet shadow-lg shadow-violet-600/30"
+                      : "btn-cyan"
+                  }`}
+                >
+                  {loadingPkg === pkg.id ? (
+                    <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    <div className="space-y-3">
-                      {history.map((item, i) => (
-                        <div
-                          key={item._id}
-                          className="sg-rise sg-txn-row bg-[#12161D] p-4 flex items-center justify-between gap-4"
-                          style={{ animationDelay: `${120 + i * 40}ms` }}
-                        >
-                          <div className="flex items-center gap-4 min-w-0">
-                            <div
-                              className="w-9 h-9 border flex items-center justify-center shrink-0"
-                              style={{
-                                borderColor: item.type === "credit" ? "#22C58B4D" : "#E8556B4D",
-                                background: item.type === "credit" ? "#0E1F1C" : "#1A0E10",
-                              }}
-                            >
-                              {item.type === "credit" ? (
-                                <ArrowDownRight size={16} className="text-[#22C58B]" />
-                              ) : (
-                                <ArrowUpRight size={16} className="text-[#E8556B]" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <h3 className="text-sm font-semibold text-[#ECEEF3] truncate">
-                                {item.reason}
-                              </h3>
-                              <p className="sg-mono text-[11px] text-[#7D8494] mt-0.5">
-                                {new Date(item.createdAt)
-                                  .toLocaleString(undefined, {
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                  .toUpperCase()}
-                              </p>
-                            </div>
-                          </div>
-                          <div
-                            className="sg-mono text-lg font-bold shrink-0"
-                            style={{ color: item.type === "credit" ? "#22C58B" : "#E8556B" }}
-                          >
-                            {item.type === "credit" ? "+" : "-"}
-                            {item.amount}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <CreditCard size={15} />
                   )}
-                </section>
-              </>
-            )}
+                  <span>
+                    {loadingPkg === pkg.id ? "Connecting Razorpay..." : `Purchase ${pkg.coins} Coins`}
+                  </span>
+                </button>
+              </div>
+            ))}
           </div>
-        </main>
+        </div>
+
+        {/* Recent Coin Activity List */}
+        <div className="space-y-4 pt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+              Recent Coin Ledger
+            </h3>
+            <button
+              onClick={() => navigate("/payments")}
+              className="text-xs text-violet-400 hover:text-cyan-300 font-mono font-semibold cursor-pointer"
+            >
+              Full Invoices →
+            </button>
+          </div>
+
+          {history.length === 0 ? (
+            <div className="p-8 rounded-2xl neon-card text-center text-xs text-gray-500">
+              No recent coin transactions recorded.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {history.slice(0, 5).map((t) => {
+                const isCredit = t.type === "credit";
+                return (
+                  <div
+                    key={t._id}
+                    className="p-4 rounded-2xl neon-card flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          isCredit
+                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                            : "bg-violet-500/15 text-violet-400 border border-violet-500/30"
+                        }`}
+                      >
+                        {isCredit ? <ArrowDownRight size={18} /> : <ArrowUpRight size={18} />}
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white block">
+                          {t.description || (isCredit ? "Wallet Top-up" : "AI Feature Consumption")}
+                        </span>
+                        <span className="text-[10px] font-mono text-gray-500 block">
+                          {new Date(t.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`text-sm font-mono font-bold ${
+                        isCredit ? "text-emerald-400" : "text-violet-400"
+                      }`}
+                    >
+                      {isCredit ? `+${t.coins}` : `-${t.coins}`} Coins
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

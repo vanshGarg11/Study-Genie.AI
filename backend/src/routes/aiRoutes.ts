@@ -6,6 +6,7 @@ import {
   generateStudyQuiz,
   generateStudyFlashcards,
   getStudyNotes,
+  deleteStudyNote,
 } from "../controllers/aiController";
 
 const router = Router();
@@ -20,6 +21,11 @@ router.get(
   protect,
   getStudyNotes
 );
+router.delete(
+  "/notes/:noteId",
+  protect,
+  deleteStudyNote
+);
 router.post(
   "/quiz",
   protect,
@@ -30,4 +36,5 @@ router.post(
   protect,
   generateStudyFlashcards
 );
+
 export default router;

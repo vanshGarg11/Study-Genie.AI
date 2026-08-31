@@ -1,17 +1,24 @@
 import { Response } from "express";
 import crypto from "crypto";
+import Razorpay from "razorpay";
 
-import { razorpay } from "../config/razorpay";
 import { AuthRequest } from "../middleware/authMiddleware";
-
 import Payment from "../models/Payment";
 import { addCoins } from "../services/coinService";
 
 const coinPackages: Record<number, number> = {
+  50: 49,
   100: 49,
+  200: 149,
   250: 99,
-  500: 199,
+  500: 299,
   1000: 349,
+};
+
+const getRazorpayInstance = () => {
+  const key_id = process.env.RAZORPAY_KEY_ID || "rzp_test_TE2wUyVmLYKPS2";
+  const key_secret = process.env.RAZORPAY_KEY_SECRET || "crOfFyNWJO3hTkBjjytqgaQZ";
+  return new Razorpay({ key_id, key_secret });
 };
 
 export const createOrder = async (
@@ -19,22 +26,23 @@ export const createOrder = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { coins } = req.body;
+    const { coins, amount: clientAmount } = req.body;
 
-    const amount = coinPackages[coins];
+    const amount = coinPackages[coins] || clientAmount || 49;
 
-    if (!amount) {
+    if (!coins || !amount) {
       res.status(400).json({
         success: false,
-        message: "Invalid coin package",
+        message: "Invalid coin package selected",
       });
       return;
     }
 
+    const razorpay = getRazorpayInstance();
     const order = await razorpay.orders.create({
-      amount: amount * 100,
+      amount: amount * 100, // Amount in paise
       currency: "INR",
-      receipt: `receipt_${Date.now()}`,
+      receipt: `rcpt_${Date.now()}`,
     });
 
     await Payment.create({
@@ -48,14 +56,13 @@ export const createOrder = async (
     res.status(200).json({
       success: true,
       order,
-      key: process.env.RAZORPAY_KEY_ID,
+      key: process.env.RAZORPAY_KEY_ID || "rzp_test_TE2wUyVmLYKPS2",
     });
   } catch (error: any) {
-    console.error(error);
-
+    console.error("Razorpay createOrder error:", error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to create payment order",
     });
   }
 };
@@ -71,20 +78,17 @@ export const verifyPayment = async (
       razorpay_signature,
     } = req.body;
 
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || "crOfFyNWJO3hTkBjjytqgaQZ";
+
     const generatedSignature = crypto
-      .createHmac(
-        "sha256",
-        process.env.RAZORPAY_KEY_SECRET!
-      )
-      .update(
-        `${razorpay_order_id}|${razorpay_payment_id}`
-      )
+      .createHmac("sha256", keySecret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
     if (generatedSignature !== razorpay_signature) {
       res.status(400).json({
         success: false,
-        message: "Payment verification failed",
+        message: "Payment verification signature mismatch",
       });
       return;
     }
@@ -97,7 +101,7 @@ export const verifyPayment = async (
     if (!payment) {
       res.status(404).json({
         success: false,
-        message: "Payment not found",
+        message: "Payment record not found",
       });
       return;
     }
@@ -113,7 +117,6 @@ export const verifyPayment = async (
     payment.paymentId = razorpay_payment_id;
     payment.signature = razorpay_signature;
     payment.status = "paid";
-
     await payment.save();
 
     await addCoins(
@@ -125,45 +128,44 @@ export const verifyPayment = async (
     res.status(200).json({
       success: true,
       message: "Payment verified successfully",
+      coinsAdded: payment.coins,
     });
   } catch (error: any) {
-    console.error(error);
-
+    console.error("Razorpay verifyPayment error:", error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Payment verification failed",
     });
   }
 };
+
 export const getPaymentHistory = async (
   req: AuthRequest,
-  res: Response
+  res: any
 ): Promise<void> => {
   try {
     const payments = await Payment.find({
       userId: req.user.userId,
     })
       .sort({ createdAt: -1 })
-      .select(
-        "amount coins status orderId paymentId createdAt"
-      );
+      .select("amount coins status orderId paymentId createdAt");
 
     res.status(200).json({
       success: true,
       payments,
     });
   } catch (error: any) {
-    console.error(error);
-
+    console.error("Get payment history error:", error);
     res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
+
 export const getPaymentById = async (
   req: AuthRequest,
-  res: Response
+  res: any
 ): Promise<void> => {
   try {
     const payment = await Payment.findOne({
@@ -172,11 +174,10 @@ export const getPaymentById = async (
     });
 
     if (!payment) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
-        message: "Payment not found",
+        message: "Payment record not found",
       });
-      return;
     }
 
     res.status(200).json({
@@ -184,8 +185,6 @@ export const getPaymentById = async (
       payment,
     });
   } catch (error: any) {
-    console.error(error);
-
     res.status(500).json({
       success: false,
       message: error.message,

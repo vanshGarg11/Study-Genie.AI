@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import AppLayout from "../components/AppLayout";
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  Coins,
-  Brain,
-  Upload,
-  User,
-  LogOut,
-  Home,
-  Sparkles,
-  FolderOpen,
   Loader2,
   Mic,
   Pause,
@@ -21,56 +13,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import Live2DTeacher from "../components/Live2DTeacher";
-
-const navItems = [
-  { label: "Dashboard", path: "/dashboard", icon: Home, index: "01" },
-  { label: "Generate Notes", path: "/notes", icon: Brain, index: "02" },
-  { label: "Upload PDF", path: "/pdf", icon: Upload, index: "03" },
-  { label: "Buy Coins", path: "/coins", icon: Coins, index: "04" },
-  { label: "Profile", path: "/profile", icon: User, index: "05" },
-];
-
-const chromeStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
-
-  .sg-root { --ink:#0E1116; --line:#262B34; --line-soft:#1B1F27; --muted:#7D8494; --cobalt:#4C6FFF; --green:#22C58B; --amber:#F2B705; --coral:#E8556B; }
-  .sg-serif { font-family:'Fraunces', serif; font-optical-sizing:auto; }
-  .sg-mono { font-family:'IBM Plex Mono', monospace; }
-
-  .sg-nav-item { position: relative; border: 1px solid transparent; }
-  .sg-nav-item .sg-bracket {
-    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-    background: var(--cobalt); transform: scaleY(0); transform-origin: top;
-    transition: transform .28s cubic-bezier(.2,.8,.2,1);
-  }
-  .sg-nav-item:hover .sg-bracket { transform: scaleY(1); }
-  .sg-nav-item:hover { border-color: var(--line); background: #151920; }
-  .sg-nav-item .sg-idx { transition: color .2s ease, opacity .2s ease; opacity: .45; }
-  .sg-nav-item:hover .sg-idx { opacity: 1; color: var(--cobalt); }
-
-  .sg-back-btn { transition: transform .18s ease, color .18s ease, border-color .18s ease; }
-  .sg-back-btn:hover { transform: translateX(-2px); border-color: #3a4150; color: #ECEEF3; }
-
-  .sg-btn-logout { transition: background .2s ease, color .2s ease, border-color .2s ease, letter-spacing .2s ease; }
-  .sg-btn-logout:hover { letter-spacing: 0.04em; }
-
-  .sg-corner-cut { clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
-
-  .sg-press { transition: transform .16s ease, box-shadow .16s ease; }
-  .sg-press:hover:not(:disabled) { transform: translate(-2px,-2px); box-shadow: 3px 3px 0 0 var(--line); }
-  .sg-press:active:not(:disabled) { transform: translate(0,0); box-shadow: none; }
-
-  @keyframes riseIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  .sg-rise { opacity: 0; animation: riseIn .5s cubic-bezier(.2,.7,.2,1) forwards; }
-
-  .sg-progress-fill { transition: width .3s ease; }
-
-  @keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.8); } }
-  .sg-live-dot { animation: livePulse 1.3s ease-in-out infinite; }
-
-  .sg-caption-card { transition: border-color .2s ease, box-shadow .2s ease; }
-  .sg-caption-card:hover { border-color: #3a4150; box-shadow: 4px 4px 0 0 rgba(34,197,139,0.15); }
-`;
+import toast from "react-hot-toast";
 
 interface LectureSegment {
   heading: string;
@@ -93,97 +36,6 @@ interface Message {
   text: string;
 }
 
-function AppChrome({
-  headerRight,
-  children,
-}: {
-  headerRight?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const navigate = useNavigate();
-  const logout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
-  };
-
-  return (
-    <div className="sg-root min-h-screen flex font-[Inter] bg-[#0E1116] text-[#ECEEF3]">
-      <style>{chromeStyles}</style>
-
-      {/* Sidebar */}
-      <aside className="w-64 shrink-0 bg-[#0B0E13] border-r border-[#262B34] p-5 flex flex-col justify-between z-10">
-        <div>
-          <div
-            className="flex items-center gap-3 px-1 mb-9 group cursor-pointer"
-            onClick={() => navigate("/dashboard")}
-          >
-            <div className="w-9 h-9 border border-[#262B34] flex items-center justify-center bg-[#12161D] sg-corner-cut">
-              <Sparkles size={16} className="text-[#4C6FFF]" />
-            </div>
-            <span className="sg-serif text-xl font-semibold tracking-tight text-[#ECEEF3]">
-              StudyGenie
-            </span>
-          </div>
-
-          <p className="sg-mono text-[10px] uppercase tracking-[0.2em] text-[#7D8494] mb-3 px-1">
-            Navigate
-          </p>
-
-          <nav className="space-y-1">
-            {navItems.map(({ label, path, icon: Icon, index }) => (
-              <button
-                key={path}
-                onClick={() => navigate(path)}
-                className="sg-nav-item w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-[#B7BCC7]"
-              >
-                <span className="sg-bracket" />
-                <span className="flex items-center gap-3 relative z-10">
-                  <Icon size={16} className="text-[#7D8494]" />
-                  <span>{label}</span>
-                </span>
-                <span className="sg-idx sg-mono text-[10px]">{index}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        <button
-          onClick={logout}
-          className="sg-btn-logout w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-[#E8556B] border border-[#2A1A1D] hover:border-[#E8556B]/40 hover:bg-[#1A0E10]"
-        >
-          <LogOut size={16} />
-          <span className="sg-mono text-xs tracking-wide">LOG OUT</span>
-        </button>
-      </aside>
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 z-10 overflow-hidden">
-        <header className="h-[70px] shrink-0 flex items-center justify-between px-7 border-b border-[#262B34]">
-          <button
-            onClick={() => navigate(-1)}
-            className="sg-back-btn flex items-center gap-2 px-3 py-2 border border-[#262B34] text-sm text-[#7D8494] sg-mono"
-          >
-            <ArrowLeft size={15} />
-            BACK
-          </button>
-
-          {headerRight}
-
-          <button
-            onClick={() => navigate("/pdfs")}
-            className="sg-back-btn flex items-center gap-2 px-3 py-2 border border-[#262B34] text-sm text-[#7D8494] sg-mono"
-          >
-            <FolderOpen size={15} />
-            MY PDFS
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-hidden">{children}</div>
-      </div>
-    </div>
-  );
-}
-
 export default function LectureRoom() {
   const { lectureId } = useParams();
 
@@ -195,16 +47,17 @@ export default function LectureRoom() {
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "teacher",
-      text: "Welcome. I will teach this book section by section. You can interrupt me anytime with a question.",
+      text: "Welcome to class! I will guide you through this document section by section. Feel free to interrupt me with questions at any time.",
     },
   ]);
 
   const fetchLecture = useCallback(async () => {
     setLoading(true);
-
     try {
       const res = await api.get(`/api/lecture/${lectureId}`);
       setLecture(res.data.lecture);
+    } catch {
+      toast.error("Could not load video lecture.");
     } finally {
       setLoading(false);
     }
@@ -212,7 +65,6 @@ export default function LectureRoom() {
 
   useEffect(() => {
     fetchLecture();
-
     return () => {
       window.speechSynthesis.cancel();
     };
@@ -224,12 +76,18 @@ export default function LectureRoom() {
     return Math.round(((lecture.currentSegment + 1) / lecture.segments.length) * 100);
   }, [lecture]);
 
-  const updateState = useCallback(async (updates: Partial<Lecture>) => {
-    if (!lectureId) return;
-
-    const res = await api.patch(`/api/lecture/${lectureId}/state`, updates);
-    setLecture(res.data.lecture);
-  }, [lectureId]);
+  const updateState = useCallback(
+    async (updates: Partial<Lecture>) => {
+      if (!lectureId) return;
+      try {
+        const res = await api.patch(`/api/lecture/${lectureId}/state`, updates);
+        setLecture(res.data.lecture);
+      } catch {
+        // Non-blocking
+      }
+    },
+    [lectureId]
+  );
 
   const speak = (text: string, onEnd?: () => void) => {
     window.speechSynthesis.cancel();
@@ -247,7 +105,6 @@ export default function LectureRoom() {
 
   const startTeaching = async () => {
     if (!lecture || !segment) return;
-
     await updateState({ status: "teaching" } as Partial<Lecture>);
     speak(segment.script, async () => {
       await updateState({ status: "paused" } as Partial<Lecture>);
@@ -262,11 +119,13 @@ export default function LectureRoom() {
 
   const goToSegment = async (nextSegment: number) => {
     if (!lecture) return;
-
     window.speechSynthesis.cancel();
     setSpeaking(false);
     await updateState({
-      currentSegment: Math.max(0, Math.min(nextSegment, lecture.segments.length - 1)),
+      currentSegment: Math.max(
+        0,
+        Math.min(nextSegment, lecture.segments.length - 1)
+      ),
       status: "paused",
     } as Partial<Lecture>);
   };
@@ -289,6 +148,14 @@ export default function LectureRoom() {
       setLecture(res.data.lecture);
       setMessages((prev) => [...prev, { sender: "teacher", text: answer }]);
       speak(answer);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "teacher",
+          text: "I couldn't answer that right now. Please try again.",
+        },
+      ]);
     } finally {
       setAsking(false);
     }
@@ -296,192 +163,187 @@ export default function LectureRoom() {
 
   if (loading || !lecture || !segment) {
     return (
-      <AppChrome>
-        <div className="min-h-full flex items-center justify-center">
-          <Loader2 className="animate-spin text-[#22C58B]" size={30} />
+      <AppLayout title="Entering AI Lecture Room...">
+        <div className="h-96 flex items-center justify-center">
+          <Loader2 className="animate-spin text-cyan-400" size={32} />
         </div>
-      </AppChrome>
+      </AppLayout>
     );
   }
 
   return (
-    <AppChrome
-      headerRight={
-        <div className="text-right">
-          <p className="sg-mono text-[10px] uppercase tracking-[0.22em] text-[#22C58B] flex items-center justify-end gap-1.5">
-            <span className="sg-live-dot w-1.5 h-1.5 rounded-full bg-[#22C58B]" />
-            Live AI Video Lecture
-          </p>
-          <h1 className="sg-serif font-semibold">{lecture.title}</h1>
+    <AppLayout
+      title={`Live AI Classroom: ${lecture.title}`}
+      subtitle={`Part ${lecture.currentSegment + 1} of ${lecture.segments.length} • Live2D Interactive Teacher`}
+      actionButton={
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full badge-cyan text-xs font-mono font-semibold">
+            <span className={`w-2 h-2 rounded-full ${speaking ? "bg-cyan-400 animate-ping" : "bg-cyan-500"}`} />
+            {speaking ? "Teacher Speaking" : "Live Ready"}
+          </span>
         </div>
       }
     >
-      <div className="h-full grid grid-cols-[minmax(0,1fr)_390px]">
-        <section className="relative overflow-hidden border-r border-[#262B34] bg-[#05070B]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_34%,#183454_0,#071019_54%,#05070B_100%)]" />
-          <div className="absolute inset-0 opacity-20 bg-[linear-gradient(#202632_1px,transparent_1px),linear-gradient(90deg,#202632_1px,transparent_1px)] bg-[size:48px_48px]" />
-
-          <div className="relative z-10 h-full flex flex-col">
-            <div className="sg-rise px-10 pt-8 shrink-0" style={{ animationDelay: "0ms" }}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="sg-mono text-xs uppercase tracking-[0.22em] text-[#8B92A3]">
-                  Class part {lecture.currentSegment + 1} of {lecture.segments.length}
-                </span>
-                <span className="sg-mono text-xs text-[#22C58B] flex items-center gap-1.5">
-                  {speaking && <span className="sg-live-dot w-1.5 h-1.5 rounded-full bg-[#22C58B]" />}
-                  {speaking ? "Teacher speaking" : `${progress}% complete`}
-                </span>
-              </div>
-              <div className="h-2 bg-[#0E1116] border border-[#202632]">
-                <div className="sg-progress-fill h-full bg-[#22C58B]" style={{ width: `${progress}%` }} />
-              </div>
+      <div className="max-w-7xl mx-auto h-[calc(100vh-140px)] flex flex-col lg:flex-row gap-6">
+        {/* Main Stage & Live2D Avatar */}
+        <div className="flex-1 p-6 sm:p-8 rounded-3xl neon-card flex flex-col justify-between relative overflow-hidden bg-gradient-to-b from-[#0F172A]/90 to-[#08090E] border-cyan-500/20">
+          <div className="space-y-3 z-10">
+            <div className="flex items-center justify-between">
+              <span className="px-3 py-1 rounded-full badge-violet font-mono text-xs font-semibold uppercase tracking-wider">
+                Segment {lecture.currentSegment + 1} of {lecture.segments.length}
+              </span>
+              <span className="text-xs font-mono text-cyan-400 font-bold">
+                {progress}% Complete
+              </span>
             </div>
 
-            <div className="flex-1 min-h-0 px-10 py-7">
-              <div className="relative h-full min-h-[420px] overflow-hidden border border-[#273243] bg-[#0B0E13]/80">
-                <div
-                  className="sg-rise absolute left-8 top-8 z-20 max-w-[380px] border border-[#2D3545] bg-[#05070B]/90 p-5"
-                  style={{ animationDelay: "60ms" }}
-                >
-                  <p className="sg-mono text-[10px] uppercase tracking-[0.22em] text-[#22C58B]">
-                    Today's class
-                  </p>
-                  <h2 className="sg-serif mt-3 text-3xl font-semibold leading-tight text-[#ECEEF3]">
-                    {segment.heading}
-                  </h2>
-                  <p className="mt-3 text-sm leading-6 text-[#A8AFBE]">
-                    {segment.objective}
-                  </p>
-                </div>
-
-                <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#05070B] via-[#05070B]/80 to-transparent" />
-
-                <div className="absolute inset-0 flex items-end justify-center pb-24">
-                  <div className="relative h-full w-full max-w-[430px] max-h-[620px] aspect-[430/620] overflow-hidden">
-                    <Live2DTeacher speaking={speaking} />
-                  </div>
-                </div>
-
-                <div className="absolute bottom-8 left-8 right-8 z-20">
-                  <div
-                    className="sg-rise sg-caption-card border border-[#2D3545] bg-[#05070B]/95 p-5 shadow-2xl"
-                    style={{ animationDelay: "120ms" }}
-                  >
-                    <p className="sg-mono text-[10px] uppercase tracking-[0.22em] text-[#8B92A3] mb-2">
-                      Live teacher captions
-                    </p>
-                    <p className="text-lg leading-8 text-[#D9DDE7] line-clamp-3">
-                      {segment.script}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-400 to-violet-500 transition-all duration-300 rounded-full"
+                style={{ width: `${progress}%` }}
+              />
             </div>
 
-            <div className="px-10 pb-8 shrink-0 flex items-center justify-between gap-4">
-              <div className="flex gap-3">
+            <div className="pt-2">
+              <h2 className="text-xl sm:text-2xl font-black text-white leading-snug">
+                {segment.heading}
+              </h2>
+              <p className="text-xs text-gray-400 mt-1">
+                {segment.objective}
+              </p>
+            </div>
+          </div>
+
+          {/* Live2D Avatar Stage */}
+          <div className="relative my-auto flex items-center justify-center min-h-[280px] max-h-[400px]">
+            <div className="w-full max-w-[340px] aspect-[430/620] overflow-hidden">
+              <Live2DTeacher speaking={speaking} />
+            </div>
+          </div>
+
+          {/* Captions & Controls Bottom */}
+          <div className="space-y-4 z-10 pt-2">
+            <div className="p-4 rounded-2xl bg-black/60 border border-white/[0.08] backdrop-blur-md">
+              <span className="text-[10px] font-mono uppercase font-bold text-gray-400 block mb-1">
+                Live Speech Subtitles
+              </span>
+              <p className="text-sm text-gray-200 line-clamp-2 leading-relaxed italic">
+                "{segment.script}"
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2.5">
                 <button
                   onClick={startTeaching}
                   disabled={speaking}
-                  className="sg-press px-5 py-3 bg-[#22C58B] text-[#062016] font-semibold text-sm sg-mono disabled:opacity-50 flex items-center gap-2"
+                  className="btn-cyan px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 disabled:opacity-40 cursor-pointer"
                 >
-                  <Play size={17} />
-                  START / CONTINUE
+                  <Play size={15} />
+                  <span>Start Lecture</span>
                 </button>
+
                 <button
                   onClick={pauseTeaching}
                   disabled={!speaking}
-                  className="sg-press px-5 py-3 border border-[#F2B705]/50 text-[#F2B705] text-sm sg-mono disabled:opacity-50 flex items-center gap-2"
+                  className="btn-ghost px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 disabled:opacity-40 cursor-pointer"
                 >
-                  <Pause size={17} />
-                  PAUSE
+                  <Pause size={15} />
+                  <span>Pause</span>
                 </button>
+
                 <button
                   onClick={pauseTeaching}
-                  className="sg-press px-5 py-3 border border-[#E8556B]/50 text-[#E8556B] text-sm sg-mono flex items-center gap-2"
+                  className="px-4 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 text-xs font-semibold flex items-center gap-2 cursor-pointer transition-all"
                 >
-                  <Square size={17} />
-                  STOP
+                  <Square size={15} />
+                  <span>Stop</span>
                 </button>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   disabled={lecture.currentSegment === 0}
                   onClick={() => goToSegment(lecture.currentSegment - 1)}
-                  className="sg-press px-4 py-3 border border-[#2D3545] disabled:opacity-40"
+                  className="btn-ghost p-2.5 rounded-xl disabled:opacity-30 cursor-pointer"
                 >
-                  <ChevronLeft size={18} />
+                  <ChevronLeft size={16} />
                 </button>
+
                 <button
-                  disabled={lecture.currentSegment === lecture.segments.length - 1}
+                  disabled={
+                    lecture.currentSegment === lecture.segments.length - 1
+                  }
                   onClick={() => goToSegment(lecture.currentSegment + 1)}
-                  className="sg-press px-4 py-3 border border-[#2D3545] disabled:opacity-40"
+                  className="btn-ghost p-2.5 rounded-xl disabled:opacity-30 cursor-pointer"
                 >
-                  <ChevronRight size={18} />
+                  <ChevronRight size={16} />
                 </button>
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <aside className="bg-[#0B0E13] flex flex-col">
-          <div className="p-5 border-b border-[#262B34]">
-            <div className="flex items-center gap-2">
-              <Mic size={18} className="text-[#22C58B]" />
-              <h2 className="sg-serif font-semibold">Talk To Teacher</h2>
+        {/* Live Interruption Q&A Sidebar */}
+        <div className="w-full lg:w-96 p-5 rounded-3xl neon-card flex flex-col justify-between shrink-0 h-64 lg:h-full border-cyan-500/20">
+          <div className="space-y-3 flex-1 flex flex-col min-h-0">
+            <div className="flex items-center gap-2 pb-3 border-b border-white/[0.06]">
+              <Mic size={18} className="text-cyan-400" />
+              <div>
+                <h3 className="text-sm font-bold text-white">Ask AI Teacher</h3>
+                <p className="text-[10px] text-gray-400">
+                  Interrupt to clarify points in real-time
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-[#8B92A3] mt-1">
-              Interrupt the lecture, ask a question, then continue.
-            </p>
-          </div>
 
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            {messages.map((message, index) => (
-              <div
-                key={`${message.sender}-${index}`}
-                className={`flex ${
-                  message.sender === "student" ? "justify-end" : "justify-start"
-                }`}
-              >
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {messages.map((msg, idx) => (
                 <div
-                  className={`max-w-[88%] border px-4 py-3 text-sm leading-6 ${
-                    message.sender === "student"
-                      ? "border-[#4C6FFF] bg-[#17213D] text-white"
-                      : "border-[#262B34] bg-[#05070B] text-[#D9DDE7]"
+                  key={idx}
+                  className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
+                    msg.sender === "student"
+                      ? "bg-violet-600/20 border border-violet-500/30 text-violet-200 ml-4"
+                      : "bg-white/[0.03] border border-white/[0.06] text-gray-200 mr-4"
                   }`}
                 >
-                  {message.text}
+                  <span className="text-[10px] font-mono font-bold uppercase block text-gray-400 mb-1">
+                    {msg.sender === "student" ? "You" : "Teacher"}
+                  </span>
+                  <p>{msg.text}</p>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            {asking && <p className="sg-mono text-sm text-[#8B92A3]">Teacher is answering...</p>}
-          </div>
-
-          <div className="p-5 border-t border-[#262B34]">
-            <div className="flex gap-2">
-              <input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") askTeacher();
-                }}
-                placeholder="Ask your teacher..."
-                className="sg-mono min-w-0 flex-1 bg-[#05070B] border border-[#262B34] px-3 py-3 text-sm outline-none focus:border-[#22C58B]"
-              />
-              <button
-                onClick={askTeacher}
-                disabled={asking || !question.trim()}
-                className="sg-press px-4 bg-[#22C58B] text-[#062016] disabled:opacity-50"
-                aria-label="Ask teacher"
-              >
-                {asking ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />}
-              </button>
+              {asking && (
+                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center gap-2 text-xs text-cyan-400 font-mono">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Teacher is explaining...</span>
+                </div>
+              )}
             </div>
           </div>
-        </aside>
+
+          <div className="pt-3 border-t border-white/[0.06] flex gap-2">
+            <input
+              type="text"
+              placeholder="Interrupt with a question..."
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") askTeacher();
+              }}
+              className="input-neon flex-1 px-3.5 py-2.5 rounded-2xl text-xs"
+            />
+            <button
+              onClick={askTeacher}
+              disabled={asking || !question.trim()}
+              className="btn-cyan p-2.5 rounded-2xl disabled:opacity-40 cursor-pointer"
+            >
+              <Send size={15} />
+            </button>
+          </div>
+        </div>
       </div>
-    </AppChrome>
+    </AppLayout>
   );
 }

@@ -68,6 +68,38 @@ export const getStudyNotes = async (
   }
 };
 
+export const deleteStudyNote = async (
+  req: AuthRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { noteId } = req.params;
+
+    const note = await Note.findOneAndDelete({
+      _id: noteId,
+      userId: req.user.userId,
+    });
+
+    if (!note) {
+      res.status(404).json({
+        success: false,
+        message: "Note not found or already deleted",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Note deleted successfully",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 export const generateStudyQuiz = async (
   req: AuthRequest,
   res: Response

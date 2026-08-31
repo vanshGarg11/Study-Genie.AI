@@ -1,10 +1,25 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Loader2, StickyNote, ListChecks, TrendingUp } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  Sparkles,
+  Lock,
+  Mail,
+  User,
+  ArrowRight,
+  Gift,
+  CheckCircle2,
+} from "lucide-react";
+import { motion } from "framer-motion";
 import api from "../services/api";
+import { useUser } from "../context/userContextValue";
+import toast, { Toaster } from "react-hot-toast";
 
-function Register() {
+export default function Register() {
   const navigate = useNavigate();
+  const { refreshUser } = useUser();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -12,330 +27,286 @@ function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+
+  const getPasswordStrength = () => {
+    if (!password) return 0;
+    let score = 0;
+    if (password.length >= 6) score += 33;
+    if (/[A-Z]/.test(password) && /[0-9]/.test(password)) score += 34;
+    if (/[^A-Za-z0-9]/.test(password) || password.length >= 10) score += 33;
+    return score;
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
 
     if (!name.trim() || !email.trim() || !password) {
-      setError("Please fill in your name, email, and password.");
+      toast.error("Please fill in all fields.");
       return;
     }
+
     if (password.length < 6) {
-      setError("Your password should be at least 6 characters.");
+      toast.error("Password must be at least 6 characters.");
       return;
     }
+
     if (password !== confirmPassword) {
-      setError("Passwords don't match.");
+      toast.error("Passwords do not match.");
       return;
     }
 
     setLoading(true);
     try {
-      await api.post("/api/auth/register", { name, email, password });
-      navigate("/");
+      const res = await api.post("/api/auth/register", {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      if (res.data.token) {
+        localStorage.setItem("token", res.data.token);
+        await refreshUser();
+        toast.success("Account created! +100 Coins credited to your wallet.");
+        navigate("/dashboard");
+      } else {
+        toast.success("Registration successful! Please sign in.");
+        navigate("/login");
+      }
     } catch (err: any) {
-      setError(
+      toast.error(
         err?.response?.data?.message ||
-          "We couldn't create your account. Please try again."
+          "Registration failed. Please verify your details."
       );
     } finally {
       setLoading(false);
     }
   };
 
+  const strength = getPasswordStrength();
+
   return (
-    <div className="min-h-screen w-full flex font-[Inter]">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+    <div className="min-h-screen w-full flex bg-[#050507] text-[#F1F5F9] relative overflow-hidden font-sans">
+      <Toaster position="top-right" />
 
-        @keyframes float-stack {
-          0%, 100% { transform: translateY(0px) rotate(-2deg); }
-          50% { transform: translateY(-10px) rotate(-2deg); }
-        }
-        @keyframes sweep-highlight {
-          0% { width: 0%; opacity: 0; }
-          15% { opacity: 1; }
-          60% { width: 100%; opacity: 1; }
-          100% { width: 100%; opacity: 1; }
-        }
-        .card-stack { animation: float-stack 6s ease-in-out infinite; }
-        .highlight-sweep {
-          position: relative;
-          display: inline-block;
-        }
-        .highlight-sweep::after {
-          content: "";
-          position: absolute;
-          left: 0; bottom: 2px;
-          height: 0.5em;
-          width: 0%;
-          background: #FFCB3D;
-          opacity: 0.55;
-          z-index: -1;
-          border-radius: 2px;
-          animation: sweep-highlight 2.4s ease-out 0.6s forwards;
-        }
-      `}</style>
+      {/* Background glow effects */}
+      <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/3 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Left Side — signature: study card stack (register-flavored) */}
-      <div
-        className="hidden lg:flex lg:w-[55%] items-center justify-center px-16 relative overflow-hidden"
-        style={{ background: "#17233D" }}
+      {/* Left Feature Showcase (Desktop) */}
+      <motion.div
+        initial={{ opacity: 0, x: -40 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="hidden lg:flex lg:w-1/2 p-12 flex-col justify-between relative border-r border-white/[0.06] hero-gradient bg-grid"
       >
-        <div
-          className="absolute inset-0 opacity-[0.06]"
-          style={{
-            backgroundImage:
-              "linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
-            backgroundSize: "36px 36px",
-          }}
-        />
+        <Link to="/" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-violet-600/30">
+            <Sparkles size={20} className="text-white" />
+          </div>
+          <div>
+            <span className="font-extrabold text-xl tracking-tight text-white block">
+              Study<span className="text-gradient-vc">Genie</span>
+            </span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-violet-400 block">
+              AI Study Assistant
+            </span>
+          </div>
+        </Link>
 
-        <div className="max-w-lg relative z-10">
-          <h1
-            className="text-6xl mb-6 text-white"
-            style={{ fontFamily: "Fraunces, serif", fontWeight: 600 }}
-          >
-            Study<span className="highlight-sweep text-white">Genie</span>
-          </h1>
-
-          <p className="text-xl leading-relaxed text-[#B7C0D6] mb-14">
-            Create your account and get a study plan, smart notes, and
-            quizzes built from your own material — in minutes.
-          </p>
-
-          {/* Card stack */}
-          <div className="relative h-56">
-            <div
-              className="card-stack absolute w-64 rounded-2xl p-5 shadow-2xl"
-              style={{
-                background: "#EEF1F6",
-                transform: "rotate(-2deg)",
-                left: 0,
-                top: 10,
-              }}
-            >
-              <div
-                className="inline-flex items-center gap-1.5 text-[11px] tracking-wide px-2 py-1 rounded-md mb-3"
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  background: "#FFCB3D",
-                  color: "#17233D",
-                }}
-              >
-                <StickyNote size={12} strokeWidth={2.5} />
-                SMART NOTES
-              </div>
-              <div className="h-2.5 rounded bg-[#C7CEDC] w-full mb-2" />
-              <div className="h-2.5 rounded bg-[#C7CEDC] w-4/5" />
+        <div className="space-y-6 max-w-lg">
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-4 glow-amber-sm">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+              <Gift size={20} />
             </div>
-
-            <div
-              className="absolute w-56 rounded-2xl p-5 shadow-xl"
-              style={{
-                background: "#1F2E4E",
-                border: "1px solid #33436B",
-                transform: "rotate(6deg)",
-                left: 150,
-                top: 55,
-              }}
-            >
-              <div
-                className="inline-flex items-center gap-1.5 text-[11px] tracking-wide px-2 py-1 rounded-md mb-3"
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  background: "#14B8A6",
-                  color: "#0B2320",
-                }}
-              >
-                <ListChecks size={12} strokeWidth={2.5} />
-                STUDY PLAN
-              </div>
-              <div className="h-2.5 rounded bg-[#3A4A6E] w-full mb-2" />
-              <div className="h-2.5 rounded bg-[#3A4A6E] w-3/5" />
-            </div>
-
-            <div
-              className="absolute w-48 rounded-2xl p-4 shadow-xl"
-              style={{
-                background: "#2A3A60",
-                border: "1px solid #3D4E77",
-                transform: "rotate(-8deg)",
-                left: 40,
-                top: 130,
-              }}
-            >
-              <div
-                className="inline-flex items-center gap-1.5 text-[10px] tracking-wide px-2 py-1 rounded-md"
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  background: "#8B7CF6",
-                  color: "#1A1533",
-                }}
-              >
-                <TrendingUp size={11} strokeWidth={2.5} />
-                PROGRESS
-              </div>
+            <div>
+              <span className="text-sm font-bold text-amber-300 block">
+                Instant Welcome Grant: 100 Coins
+              </span>
+              <span className="text-xs text-gray-300">
+                Unlock multi-slide lessons, voice audio narration, and live Q&A immediately.
+              </span>
             </div>
           </div>
+
+          <div className="space-y-3">
+            <h2 className="text-3xl font-black text-white tracking-tight">
+              Join thousands of students mastering their coursework
+            </h2>
+            <p className="text-sm text-gray-300 leading-relaxed">
+              Experience the power of LLM-grounded document learning with real-time flashcard generators, interactive quizzes, and Live2D interactive avatars.
+            </p>
+          </div>
+
+          <div className="space-y-2.5 pt-2">
+            {[
+              "Free AI Note Generation on Any Topic",
+              "PDF Chat with strict citation grounding",
+              "Interactive 3D Flashcard decks with active recall",
+              "Comprehension quiz arenas with explanations",
+            ].map((feat, i) => (
+              <div key={i} className="flex items-center gap-2.5 text-xs text-gray-300">
+                <CheckCircle2 size={15} className="text-cyan-400 shrink-0" />
+                <span>{feat}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Right Side — form */}
-      <div
-        className="w-full lg:w-[45%] flex items-center justify-center p-8"
-        style={{
-  background:
-    "linear-gradient(135deg,#EEF2FF 0%,#F8FAFC 100%)",
-}}
+        <div className="flex items-center justify-between text-xs text-gray-400 pt-6 border-t border-white/[0.06] font-mono">
+          <span>Protected by JWT & Bcrypt Encryption</span>
+          <span>© 2026 StudyGenie</span>
+        </div>
+      </motion.div>
+
+      {/* Right Register Form */}
+      <motion.div
+        initial={{ opacity: 0, x: 40 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative z-10"
       >
-        <div className="w-full max-w-lg bg-white rounded-[32px] shadow-2xl p-12">
-          <h2
-            className="text-3xl mb-2"
-            style={{ fontFamily: "Fraunces, serif", fontWeight: 600, color: "#17233D" }}
-          >
-            Create your account
-          </h2>
-          <p className="text-[#64748B] mb-8">Start studying smarter today.</p>
+        <div className="w-full max-w-md space-y-6">
+          <div className="space-y-2 text-center lg:text-left">
+            <Link to="/" className="lg:hidden inline-flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-cyan-400 flex items-center justify-center text-white font-bold">
+                <Sparkles size={18} />
+              </div>
+              <span className="font-bold text-xl text-white">StudyGenie</span>
+            </Link>
 
-          {error && (
-            <div
-              role="alert"
-              className="mb-6 px-4 py-3 rounded-xl text-sm"
-              style={{ background: "#FDECEA", color: "#B3261E", border: "1px solid #F6C6C2" }}
-            >
-              {error}
-            </div>
-          )}
+            <h2 className="text-3xl font-black text-white tracking-tight">
+              Create Scholar Account
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-400">
+              Get started with 100 free coins automatically credited.
+            </p>
+          </div>
 
-          <form onSubmit={handleRegister} noValidate>
-            <div className="mb-5">
-              <label
-                htmlFor="name"
-                className="block mb-2 text-sm font-medium"
-                style={{ color: "#334155" }}
-              >
-                Name
+          <form onSubmit={handleRegister} className="space-y-3.5">
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-gray-400 uppercase tracking-wider block">
+                Full Name
               </label>
-              <input
-                id="name"
-                type="text"
-                autoComplete="name"
-                placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border rounded-xl px-4 py-3 outline-none transition"
-                style={{ borderColor: "#CBD5E1" }}
-                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #14B8A6")}
-                onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
-              />
+              <div className="relative">
+                <User
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Alex Rivera"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="input-neon w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
+                />
+              </div>
             </div>
 
-            <div className="mb-5">
-              <label
-                htmlFor="email"
-                className="block mb-2 text-sm font-medium"
-                style={{ color: "#334155" }}
-              >
-                Email
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-gray-400 uppercase tracking-wider block">
+                Email Address
               </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="john@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border rounded-xl px-4 py-3 outline-none transition"
-                style={{ borderColor: "#CBD5E1" }}
-                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #14B8A6")}
-                onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
-              />
+              <div className="relative">
+                <Mail
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  type="email"
+                  placeholder="alex@university.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-neon w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
+                />
+              </div>
             </div>
 
-            <div className="mb-5">
-              <label
-                htmlFor="password"
-                className="block mb-2 text-sm font-medium"
-                style={{ color: "#334155" }}
-              >
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-gray-400 uppercase tracking-wider block">
                 Password
               </label>
               <div className="relative">
+                <Lock
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+                />
                 <input
-                  id="password"
                   type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border rounded-xl px-4 py-3 pr-11 outline-none transition"
-                  style={{ borderColor: "#CBD5E1" }}
-                  onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #14B8A6")}
-                  onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
+                  className="input-neon w-full pl-10 pr-10 py-2.5 rounded-xl text-sm"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+
+              {password && (
+                <div className="pt-1">
+                  <div className="h-1 w-full bg-white/[0.06] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        strength <= 33
+                          ? "bg-rose-500 w-1/3"
+                          : strength <= 67
+                          ? "bg-amber-400 w-2/3"
+                          : "bg-cyan-400 w-full"
+                      }`}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="mb-6">
-              <label
-                htmlFor="confirmPassword"
-                className="block mb-2 text-sm font-medium"
-                style={{ color: "#334155" }}
-              >
-                Confirm password
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-gray-400 uppercase tracking-wider block">
+                Confirm Password
               </label>
-              <input
-                id="confirmPassword"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="Re-enter your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full border rounded-xl px-4 py-3 outline-none transition"
-                style={{ borderColor: "#CBD5E1" }}
-                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #14B8A6")}
-                onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
-              />
+              <div className="relative">
+                <Lock
+                  size={16}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Repeat your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input-neon w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
+                />
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full text-white py-3 rounded-xl font-semibold transition flex items-center justify-center gap-2 disabled:opacity-70"
-              style={{ background: "#3F3D9E" }}
-              onMouseEnter={(e) => {
-                if (!loading) e.currentTarget.style.background = "#332F82";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#3F3D9E";
-              }}
+              className="btn-violet w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
             >
-              {loading && <Loader2 size={18} className="animate-spin" />}
-              {loading ? "Creating account..." : "Create account"}
+              {loading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <ArrowRight size={18} />
+              )}
+              <span>{loading ? "Creating Scholar Account..." : "Create Account"}</span>
             </button>
-
-            <p className="text-center mt-6 text-[#64748B]">
-              Already have an account?
-              <Link to="/" className="ml-2 font-semibold" style={{ color: "#3F3D9E" }}>
-                Sign in
-              </Link>
-            </p>
           </form>
+
+          <p className="text-center text-xs text-gray-400">
+            Already have an account?{" "}
+            <Link
+              to="/login"
+              className="text-violet-400 font-semibold hover:text-violet-300 transition-colors"
+            >
+              Log In
+            </Link>
+          </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
-
-export default Register;
